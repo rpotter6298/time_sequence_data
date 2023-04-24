@@ -8,6 +8,18 @@ from typing import Type, List, Dict
 from scipy.optimize import curve_fit
 from scipy.integrate import quad, simps
 import itertools
+from scipy.stats import pearsonr
+
+
+def polynomial(x, *coeffs):
+    return np.polyval(coeffs, x)
+
+
+def cosine_similarity(v1, v2):
+    dot_product = np.dot(v1, v2)
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+    return dot_product / (norm_v1 * norm_v2)
 
 
 class ts_analysis_module:
@@ -44,6 +56,27 @@ class ts_analysis_module:
         sns.lineplot(
             ax=ax,
             data=self.data,
+            x="Time (hrs)",
+            y="NormalizedSpeckFormation",
+            hue="Treatment",
+        )
+        ax.set_title("Speck Formation by Treatment Type")
+        ax.set_ylabel("Normalized Speck Formation")
+        ax.set_xlabel("Time")
+        return (fig, ax)
+
+    def line_plot_selected(self, treatments: List[str]):
+        """
+        Creates a line plot of the normalized speck formation over time, separated by treatment type.
+
+        Returns:
+            tuple: A tuple containing the figure and axes objects of the plot.
+        """
+        data = self.data[self.data["Treatment"].isin(treatments)]
+        fig, ax = plt.subplots()
+        sns.lineplot(
+            ax=ax,
+            data=data,
             x="Time (hrs)",
             y="NormalizedSpeckFormation",
             hue="Treatment",
@@ -396,14 +429,20 @@ class ts_analysis_module:
 
         rmse = np.sqrt(np.mean((y1_common - y2_common) ** 2))
         print(f"Root Mean Squared Error: {rmse}")
+        # Normalize the curves
+        y1_mean = np.mean(y1_common)
+        y1_std = np.std(y1_common)
+        y1_normalized = (y1_common - y1_mean) / y1_std
+
+        y2_mean = np.mean(y2_common)
+        y2_std = np.std(y2_common)
+        y2_normalized = (y2_common - y2_mean) / y2_std
+
+        # Calculate cosine similarity
+        cos_sim = cosine_similarity(y1_normalized, y2_normalized)
+        print(f"Cosine similarity: {cos_sim}")
 
     def compare_replicate_curves(self, treatment):
-        """
-        Compare the curves of all replicates for a specific treatment.
-
-        Args:
-            treatment (str): The treatment to analyze.
-        """
         treatment_data = self.data[self.data["Treatment"] == treatment]
         replicates = treatment_data["Treatment_Replicate"].unique()
 
@@ -420,7 +459,7 @@ class ts_analysis_module:
         plt.title(f"Curves for Each Replicate of {treatment}")
         plt.show()
 
-        # Calculate the ABC and RMSE for each pair of replicates
+        # Calculate the ABC, RMSE, and Cosine Similarity for each pair of replicates
         comparison_results = []
         for rep1, rep2 in itertools.combinations(replicates, 2):
             rep1_data = treatment_data[treatment_data["Treatment_Replicate"] == rep1]
@@ -435,18 +474,145 @@ class ts_analysis_module:
             # Calculate RMSE
             rmse = np.sqrt(np.mean((y1 - y2) ** 2))
 
-            comparison_results.append((rep1, rep2, abc, rmse))
+            # Normalize the curves
+            y1_mean = np.mean(y1)
+            y1_std = np.std(y1)
+            y1_normalized = (y1 - y1_mean) / y1_std
+
+            y2_mean = np.mean(y2)
+            y2_std = np.std(y2)
+            y2_normalized = (y2 - y2_mean) / y2_std
+
+            # Calculate cosine similarity
+            cos_sim = cosine_similarity(y1_normalized, y2_normalized)
+
+            comparison_results.append((rep1, rep2, abc, rmse, cos_sim))
 
         # Build the table with the comparison results
         results_table = pd.DataFrame(
-            comparison_results, columns=["Replicate 1", "Replicate 2", "ABC", "RMSE"]
+            comparison_results,
+            columns=["Replicate 1", "Replicate 2", "ABC", "RMSE", "Cosine Similarity"],
         )
 
-        # Calculate the average ABC and RMSE
+        # Calculate the average ABC, RMSE, and Cosine Similarity
         avg_abc = results_table["ABC"].mean()
         avg_rmse = results_table["RMSE"].mean()
+        avg_cos_sim = results_table["Cosine Similarity"].mean()
 
         print("Comparison results:")
         print(results_table)
         print(f"Average ABC: {avg_abc:.4f}")
         print(f"Average RMSE: {avg_rmse:.4f}")
+        print(f"Average Cosine Similarity: {avg_cos_sim:.4f}")
+
+    def compare_standardized_replicate_curves(self, treatment, shift_x=False):
+        treatment_data = self.data[self.data["Treatment"] == treatment]
+        replicates = treatment_data["Treatment_Replicate"].unique()
+        adjusted_treatment_data = pd.DataFrame()
+
+        def calc_max_time(rep_data):
+            max_std = rep_data[
+                rep_data["NormalizedSpeckFormation"]
+                == np.max(rep_data["NormalizedSpeckFormation"])
+            ]
+            max_time = max_std["Time (hrs)"].values[0]
+            return max_time
+
+        max_times = []
+        if shift_x == True:
+            # Plot the standardized curves for each replicate
+            for rep in replicates:
+                rep_data = treatment_data[treatment_data["Treatment_Replicate"] == rep]
+                max_times.append(calc_max_time(rep_data))
+        for rep in replicates:
+            rep_data = treatment_data[treatment_data["Treatment_Replicate"] == rep]
+            if shift_x == True:
+                print(calc_max_time(rep_data))
+                max_time_diff = calc_max_time(rep_data) - min(max_times)
+                print(max_time_diff)
+                rep_data["Time (hrs)"] = rep_data["Time (hrs)"] - max_time_diff
+            # print(rep_data)
+            y = rep_data["NormalizedSpeckFormation"].values / np.max(
+                rep_data["NormalizedSpeckFormation"].values
+            )
+            adjusted_treatment_data = pd.concat([adjusted_treatment_data, rep_data])
+            plt.plot(rep_data["Time (hrs)"], y, label=rep)
+
+        plt.xlabel("Time (hrs)")
+        plt.ylabel("Standardized Normalized Speck Formation")
+        plt.legend()
+        plt.title(f"Standardized Curves for Each Replicate of {treatment}")
+        plt.show()
+        # Calculate the ABC, RMSE, Cosine Similarity, and Estimated Difference for each pair of replicates
+        comparison_results = []
+        for rep1, rep2 in itertools.combinations(replicates, 2):
+            rep1_data = adjusted_treatment_data[
+                adjusted_treatment_data["Treatment_Replicate"] == rep1
+            ]
+            rep2_data = adjusted_treatment_data[
+                adjusted_treatment_data["Treatment_Replicate"] == rep2
+            ]
+
+            x1 = rep1_data["Time (hrs)"].values
+            x2 = rep2_data["Time (hrs)"].values
+            y1_standardized = rep1_data["NormalizedSpeckFormation"].values / np.max(
+                rep1_data["NormalizedSpeckFormation"].values
+            )
+            y2_standardized = rep2_data["NormalizedSpeckFormation"].values / np.max(
+                rep2_data["NormalizedSpeckFormation"].values
+            )
+
+            x_common = np.union1d(x1, x2)
+            y1_common = np.interp(x_common, x1, y1_standardized)
+            y2_common = np.interp(x_common, x2, y2_standardized)
+
+            # Calculate ABC
+            abc = simps(np.abs(y1_common - y2_common), x_common)
+
+            # Calculate RMSE
+            rmse = np.sqrt(np.mean((y1_common - y2_common) ** 2))
+
+            # Calculate Pearson correlation
+            pearson_corr, _ = pearsonr(y1_common, y2_common)
+
+            # Normalize the curves
+            y1_mean = np.mean(y1_common)
+            y1_std = np.std(y1_common)
+            y1_normalized = (y1_common - y1_mean) / y1_std
+
+            y2_mean = np.mean(y2_common)
+            y2_std = np.std(y2_common)
+            y2_normalized = (y2_common - y2_mean) / y2_std
+
+            # Calculate cosine similarity
+            cos_sim = np.dot(y1_normalized, y2_normalized) / (
+                np.linalg.norm(y1_normalized) * np.linalg.norm(y2_normalized)
+            )
+            # Calculate Estimated Difference
+            est_diff = rmse * (1 - cos_sim)
+
+            comparison_results.append(
+                (rep1, rep2, abc, rmse, cos_sim, pearson_corr, est_diff)
+            )
+
+        # Build the table with the comparison results
+        results_table = pd.DataFrame(
+            comparison_results,
+            columns=[
+                "Replicate 1",
+                "Replicate 2",
+                "ABC",
+                "RMSE",
+                "Cosine Similarity",
+                "Pearson Correlation",
+                "Estimated Difference",
+            ],
+        )
+
+        # Calculate the average ABC, RMSE, Cosine Similarity, and Estimated Difference
+        avg_abc = results_table["ABC"].mean()
+        avg_rmse = results_table["RMSE"].mean()
+        avg_cos_sim = results_table["Cosine Similarity"].mean()
+        avg_pearson_corr = results_table["Pearson Correlation"].mean()
+        avg_est_diff = results_table["Estimated Difference"].mean()
+        print(results_table)

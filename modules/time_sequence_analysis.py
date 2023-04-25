@@ -65,7 +65,7 @@ class ts_analysis_module:
         ax.set_xlabel("Time")
         return (fig, ax)
 
-    def line_plot_selected(self, treatments: List[str]):
+    def line_plot_selected(self, treatments: List[str], show_p=False):
         """
         Creates a line plot of the normalized speck formation over time, separated by treatment type.
 
@@ -73,7 +73,7 @@ class ts_analysis_module:
             tuple: A tuple containing the figure and axes objects of the plot.
         """
         data = self.data[self.data["Treatment"].isin(treatments)]
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(10, 6))
         sns.lineplot(
             ax=ax,
             data=data,
@@ -84,6 +84,40 @@ class ts_analysis_module:
         ax.set_title("Speck Formation by Treatment Type")
         ax.set_ylabel("Normalized Speck Formation")
         ax.set_xlabel("Time")
+
+        # Get the current ylim values
+        ymin, ymax = ax.get_ylim()
+        # Set the new ylim with an increased upper limit
+        ax.set_ylim(ymin, ymax * 1.25)
+
+        if show_p:
+            p_values_text = ""
+            for treatment in treatments:
+                treatment_data = data[data["Treatment"] == treatment]
+                max_time = treatment_data.loc[
+                    treatment_data["NormalizedSpeckFormation"].idxmax(), "Time (hrs)"
+                ]
+                time_zero_data = treatment_data[treatment_data["Time (hrs)"] == 0][
+                    "NormalizedSpeckFormation"
+                ]
+                max_time_data = treatment_data[
+                    treatment_data["Time (hrs)"] == max_time
+                ]["NormalizedSpeckFormation"]
+                u_stat, p_value = stats.ttest_rel(time_zero_data, max_time_data)
+                p_values_text += (
+                    f"{treatment} (Max = {max_time} hrs): p = {p_value:.4f}\n"
+                )
+
+            ax.text(
+                0.02,
+                0.98,
+                p_values_text,
+                transform=ax.transAxes,
+                fontsize=10,
+                verticalalignment="top",
+                horizontalalignment="left",
+            )
+
         return (fig, ax)
 
     def compare_max_speck_time(self):
@@ -167,6 +201,74 @@ class ts_analysis_module:
         u_stat, p_value = stats.mannwhitneyu(data1, data2, alternative="two-sided")
         print(f"{treatment1} vs {treatment2} ({metric}): p-value = {p_value}")
 
+    # def check_modifier_impact(self):
+    #     """
+    #     Checks the impact of the modifier on treatments by comparing the maximum speck time and maximum growth rate.
+    #     """
+    #     if not self.comp.comp.modifier:
+    #         print("No modifier specified.")
+    #         return
+
+    #     # Calculate maximum speck time and maximum growth rate
+    #     max_speck_time = self.compare_max_speck_time()
+    #     max_growth_rate = self.compare_growth_rate()
+
+    #     # Loop through the treatments and compare them with their modified counterparts
+    #     for t in self.comp.comp.treatments:
+    #         print(f"Comparing treatment {t} with {self.comp.comp.modifier}_{t}:")
+
+    #         # Max growth rate
+    #         base_growth = max_growth_rate[max_growth_rate["Treatment"] == t][
+    #             "GrowthRate"
+    #         ]
+    #         mod_growth = max_growth_rate[
+    #             max_growth_rate["Treatment"] == f"{self.comp.comp.modifier}_{t}"
+    #         ]["GrowthRate"]
+
+    #         u_stat, p_value = stats.mannwhitneyu(base_growth, mod_growth)
+    #         print(
+    #             f"Max growth rate - p-value: {p_value:.4f}, power difference: {np.mean(mod_growth) / np.mean(base_growth):.4f}, means: {np.mean(base_growth):.4f} vs {np.mean(mod_growth):.4f}"
+    #         )
+
+    #         # Time to max growth rate
+    #         base_time_growth = max_growth_rate[max_growth_rate["Treatment"] == t][
+    #             "Time (hrs)"
+    #         ]
+    #         mod_time_growth = max_growth_rate[
+    #             max_growth_rate["Treatment"] == f"{self.comp.comp.modifier}_{t}"
+    #         ]["Time (hrs)"]
+
+    #         u_stat, p_value = stats.mannwhitneyu(base_time_growth, mod_time_growth)
+    #         print(
+    #             f"Time to max growth rate - p-value: {p_value:.4f}, power difference: {np.mean(mod_time_growth) / np.mean(base_time_growth):.4f}, means: {np.mean(base_time_growth):.4f} vs {np.mean(mod_time_growth):.4f}"
+    #         )
+
+    #         # Max speck time
+    #         base_time = max_speck_time[max_speck_time["Treatment"] == t]["Time (hrs)"]
+    #         mod_time = max_speck_time[
+    #             max_speck_time["Treatment"] == f"{self.comp.comp.modifier}_{t}"
+    #         ]["Time (hrs)"]
+
+    #         u_stat, p_value = stats.mannwhitneyu(base_time, mod_time)
+    #         print(
+    #             f"Max speck time - p-value: {p_value:.4f}, power difference: {np.mean(mod_time) / np.mean(base_time):.4f}, means: {np.mean(base_time):.4f} vs {np.mean(mod_time):.4f}"
+    #         )
+
+    #         # Maximum amount of specks
+    #         base_specks = self.data[self.data["Treatment"] == t][
+    #             "NormalizedSpeckFormation"
+    #         ]
+    #         mod_specks = self.data[
+    #             self.data["Treatment"] == f"{self.comp.comp.modifier}_{t}"
+    #         ]["NormalizedSpeckFormation"]
+
+    #         u_stat, p_value = stats.mannwhitneyu(base_specks, mod_specks)
+    #         print(
+    #             f"Max specks - p-value: {p_value:.4f}, power difference: {np.mean(mod_specks) / np.mean(base_specks):.4f}, means: {np.mean(base_specks):.4f} vs {np.mean(mod_specks):.4f}"
+    #         )
+
+    #         print()
+
     def check_modifier_impact(self):
         """
         Checks the impact of the modifier on treatments by comparing the maximum speck time and maximum growth rate.
@@ -179,9 +281,11 @@ class ts_analysis_module:
         max_speck_time = self.compare_max_speck_time()
         max_growth_rate = self.compare_growth_rate()
 
+        results = []
+
         # Loop through the treatments and compare them with their modified counterparts
         for t in self.comp.comp.treatments:
-            print(f"Comparing treatment {t} with {self.comp.comp.modifier}_{t}:")
+            result = {"Treatment": t, "Modifier": self.comp.comp.modifier}
 
             # Max growth rate
             base_growth = max_growth_rate[max_growth_rate["Treatment"] == t][
@@ -192,8 +296,13 @@ class ts_analysis_module:
             ]["GrowthRate"]
 
             u_stat, p_value = stats.mannwhitneyu(base_growth, mod_growth)
-            print(
-                f"Max growth rate - p-value: {p_value:.4f}, power difference: {np.mean(mod_growth) / np.mean(base_growth):.4f}, means: {np.mean(base_growth):.4f} vs {np.mean(mod_growth):.4f}"
+            result["Max_growth_rate_p_value"] = p_value
+            result["Max_growth_rate_power_difference"] = np.mean(mod_growth) / np.mean(
+                base_growth
+            )
+            result["Max_growth_rate_mean_(base)"] = np.mean(base_growth)
+            result[f"Max_growth_rate_mean_({self.comp.comp.modifier})"] = np.mean(
+                mod_growth
             )
 
             # Time to max growth rate
@@ -205,8 +314,13 @@ class ts_analysis_module:
             ]["Time (hrs)"]
 
             u_stat, p_value = stats.mannwhitneyu(base_time_growth, mod_time_growth)
-            print(
-                f"Time to max growth rate - p-value: {p_value:.4f}, power difference: {np.mean(mod_time_growth) / np.mean(base_time_growth):.4f}, means: {np.mean(base_time_growth):.4f} vs {np.mean(mod_time_growth):.4f}"
+            result["Time_max_growth_rate_p_value"] = p_value
+            result["Time_max_growth_rate_power_difference"] = np.mean(
+                mod_time_growth
+            ) / np.mean(base_time_growth)
+            result["Time_max_growth_rate_mean_(base)"] = np.mean(base_time_growth)
+            result[f"Time_max_growth_rate_mean_({self.comp.comp.modifier})"] = np.mean(
+                mod_time_growth
             )
 
             # Max speck time
@@ -216,8 +330,13 @@ class ts_analysis_module:
             ]["Time (hrs)"]
 
             u_stat, p_value = stats.mannwhitneyu(base_time, mod_time)
-            print(
-                f"Max speck time - p-value: {p_value:.4f}, power difference: {np.mean(mod_time) / np.mean(base_time):.4f}, means: {np.mean(base_time):.4f} vs {np.mean(mod_time):.4f}"
+            result["Max_speck_time_p_value"] = p_value
+            result["Max_speck_time_power_difference"] = np.mean(mod_time) / np.mean(
+                base_time
+            )
+            result["Max_speck_time_mean_(base)"] = np.mean(base_time)
+            result[f"Max_speck_time_mean_({self.comp.comp.modifier})"] = np.mean(
+                mod_time
             )
 
             # Maximum amount of specks
@@ -229,11 +348,19 @@ class ts_analysis_module:
             ]["NormalizedSpeckFormation"]
 
             u_stat, p_value = stats.mannwhitneyu(base_specks, mod_specks)
-            print(
-                f"Max specks - p-value: {p_value:.4f}, power difference: {np.mean(mod_specks) / np.mean(base_specks):.4f}, means: {np.mean(base_specks):.4f} vs {np.mean(mod_specks):.4f}"
+            result["Max_specks_p_value"] = p_value
+            result["Max_specks_power_difference"] = np.mean(mod_specks) / np.mean(
+                base_specks
             )
+            result["Max_specks_mean_(base)"] = np.mean(base_specks)
+            result[f"Max_specks_mean_({self.comp.comp.modifier})"] = np.mean(mod_specks)
 
-            print()
+            results.append(result)
+
+            # Convert the results list to a DataFrame
+        results_df = pd.DataFrame(results)
+
+        return results_df
 
     def create_summary_table(self):
         """
@@ -542,7 +669,7 @@ class ts_analysis_module:
         plt.ylabel("Standardized Normalized Speck Formation")
         plt.legend()
         plt.title(f"Standardized Curves for Each Replicate of {treatment}")
-        plt.show()
+        # plt.show()
         # Calculate the ABC, RMSE, Cosine Similarity, and Estimated Difference for each pair of replicates
         comparison_results = []
         for rep1, rep2 in itertools.combinations(replicates, 2):
@@ -616,3 +743,4 @@ class ts_analysis_module:
         avg_pearson_corr = results_table["Pearson Correlation"].mean()
         avg_est_diff = results_table["Estimated Difference"].mean()
         print(results_table)
+        return (plt, results_table)

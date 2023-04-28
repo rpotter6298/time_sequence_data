@@ -30,7 +30,16 @@ def main():
     return working_model
 
 
+base_treatments = ["ATP", "MSU", "Nigericin"]
+modifier = "MCC950"
+short_name_dict = {"nig": "Nigericin"}
+
 working_model = main()
+data_module = Cytokine_Adapter(base_treatments, short_name_dict=short_name_dict)
+data_module.data
+data_module.data["Treatment"].unique()
+data_module.data.sort_values(by=["Treatment", "ExperimentalReplicate"])
+
 untreated = working_model.comp.comp.treatments
 treated = [
     working_model.comp.comp.modifier + "_" + t

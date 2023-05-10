@@ -1,9 +1,17 @@
 import pandas as pd
 import re
+from pathlib import Path
 
 
 class Count_Aggregator:
-    def __init__(self, file_path, treatments, modifier=None, short_name_dict={}):
+    def __init__(
+        self,
+        name,
+        treatments,
+        modifier=None,
+        short_name_dict={},
+        file_path=Path("data", "speck_data", "count_all_data.xlsx"),
+    ):
         """
         Initializes the count_aggregator class.
 
@@ -13,6 +21,7 @@ class Count_Aggregator:
         modifier (str, optional): The treatment modifier. Default is None.
         short_name_dict (dict, optional): A dictionary of short names for treatments. Default is an empty dictionary.
         """
+        self.name = name
         self.xls = pd.read_excel(file_path, sheet_name=None, header=1)
         self.treatments = treatments
         self.modifier = modifier
@@ -106,6 +115,7 @@ class Count_Aggregator:
         """
         all_sheets = []
         for sheet_name, df in self.xls.items():
+            # print(sheet_name)
             # Add a column with the sheet name
             df["SheetName"] = sheet_name
 
@@ -117,8 +127,8 @@ class Count_Aggregator:
             experimental_replicate, technical_replicate = self.extract_replicates(
                 sheet_name
             )
-            df["ExperimentalReplicate"] = experimental_replicate
-            df["TechnicalReplicate"] = technical_replicate
+            df["Experimental_Replicate"] = experimental_replicate
+            df["Technical_Replicate"] = technical_replicate
             all_sheets.append(df)
         return all_sheets
 
@@ -135,8 +145,8 @@ class Count_Aggregator:
                 [
                     "Time (hrs)",
                     "Treatment",
-                    "ExperimentalReplicate",
-                    "TechnicalReplicate",
+                    "Experimental_Replicate",
+                    "Technical_Replicate",
                 ],
                 axis=1,
             )

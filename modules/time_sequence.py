@@ -14,38 +14,107 @@ class time_sequence_module:
         :param time_limits: An optional dictionary specifying time limits for the data. Defaults to None.
         """
         self.comp = data_class
+        self.name = "TS_" + data_class.name
         self.raw_data = data_class.data
         self.time_limits = time_limits
-        self.data = self.normalize()
 
-    def normalize(self, robust=True):
+        possible_variables = self.raw_data.columns.difference(
+            [
+                "Analyte",
+                "Treatment",
+                "Time (hrs)",
+                "Experimental_Replicate",
+                "Technical_Replicate",
+            ]
+        )
+        print(
+            "Time Sequence Module Initialized. Please run structure_data() to normalize data using one of the following column names:"
+        )
+        print(possible_variables.tolist())
+
+    def structure_data(
+        self, variable: str, robust=True, merge_technical_replicates=True
+    ):
         """
-        Normalizes the data by dividing the SpeckFormation by the initial values at time 0.
+        Normalizes the data by dividing the selected variable by the initial values at time 0.
+        Renames columns to standardize the names.
 
+        :param variable: The variable to be normalized. Should be a column name in the data.
         :param robust: Optional boolean to calculate growth rate. Defaults to True.
         :return: DataFrame with normalized data.
         """
-        tech_merge = input("Merge Technical Replicates? (y/n): ")
-        if tech_merge == "y":
-            data = self.merge_technical_replicates()
-        elif tech_merge == "n":
-            data = self.preserve_technical_replicates()
-        else:
-            print("Invalid input.")
+
+        ##Check that variable is in the columns
+        if variable not in self.raw_data.columns:
+            print("Variable not in columns. Please check input.")
             return
-        initial_values = data[data["Time (hrs)"] == 0].set_index("Treatment_Replicate")[
-            "SpeckFormation"
-        ]
-        data["NormalizedSpeckFormation"] = data.apply(
-            lambda row: row["SpeckFormation"]
-            / initial_values[row["Treatment_Replicate"]],
-            axis=1,
-        )
+        ##Check that "Analyte" is in the columns and add it with a default value if not
+        if "Analyte" not in self.raw_data.columns:
+            self.raw_data["Analyte"] = "NA"
+        if "Technical_Replicate" not in self.raw_data.columns:
+            self.raw_data["Technical_Replicate"] = "NA"
+        if "Time (hrs)" not in self.raw_data.columns:
+            self.raw_data["Time (hrs)"] = 0
+            print("Time (hrs) not in columns. Results may be corrupted.")
+        ##Make sure that time column is numeric
+        self.raw_data["Time (hrs)"] = pd.to_numeric(self.raw_data["Time (hrs)"])
+        ##Rename the variable column to "Measurement"
+        data = self.raw_data.rename(columns={variable: "Measurement"})
         if self.time_limits is not None:
             data = self.limit_data(data, self.time_limits)
+        # ##Define function to merge technical replicates
+        # def merge_technical_replicates (data):
+        #     """
+        #     Merges technical replicates by averaging the values.
+        #     :return: DataFrame with merged technical replicates.
+        #     """
+        #     data = data.groupby(["Analyte","Treatment", "Time (hrs)", 'Experimental_Replicate']).mean().reset_index()
+        #     return data
+        if merge_technical_replicates == True:
+            data = (
+                data.groupby(
+                    ["Analyte", "Treatment", "Time (hrs)", "Experimental_Replicate"]
+                )
+                .mean()
+                .reset_index()
+            )
+
+        ##Define function to normalize data
+        def normalize_data(data):
+            """
+            Normalizes the data by dividing the selected variable by the initial values at time 0.
+            :return: DataFrame with normalized data.
+            """
+            initial_values = data[data["Time (hrs)"] == 0].set_index(
+                ["Analyte", "Treatment", "Experimental_Replicate"]
+            )["Measurement"]
+            data["Normalized_Measurement"] = data.apply(
+                lambda row: row["Measurement"]
+                / initial_values[
+                    (row["Analyte"], row["Treatment"], row["Experimental_Replicate"])
+                ],
+                axis=1,
+            )
+            return data
+
+        data = normalize_data(data)
+
         if robust == True:
-            data = self.calc_growth_rate(data)
-        return data
+
+            def calc_change_rate(data):
+                change_rate = data.copy()
+                change_rate["Normalized_Change_Rate"] = change_rate.groupby(
+                    ["Analyte", "Treatment", "Experimental_Replicate"]
+                )["Normalized_Measurement"].diff()
+                change_rate["Change_Rate"] = change_rate.groupby(
+                    ["Analyte", "Treatment", "Experimental_Replicate"]
+                )["Measurement"].diff()
+                return change_rate
+
+        data = calc_change_rate(data)
+        data[(data["Treatment"] == "ATP") & (data["Experimental_Replicate"] == "1")]
+        self.data = data
+        print("Data structured. Please connect analysis module.")
 
     def limit_data(self, data, time_limits):
         """
@@ -76,61 +145,3 @@ class time_sequence_module:
                         )
                     ]
             return limited_data
-
-    def merge_technical_replicates(self):
-        """
-        Merges technical replicates by averaging their SpeckFormation values.
-
-        :return: DataFrame with merged technical replicates.
-        """
-        data = self.raw_data.copy()
-        data["Treatment_Replicate"] = (
-            data["Treatment"] + "_" + data["ExperimentalReplicate"]
-        )
-        merged_data = (
-            data.groupby(["Treatment_Replicate", "Time (hrs)"])["SpeckFormation"]
-            .mean()
-            .reset_index()
-        )
-        # Merge the grouped data back with the original data, dropping the "SpeckFormation" column
-        data = data.drop("SpeckFormation", axis=1).merge(
-            merged_data, on=["Treatment_Replicate", "Time (hrs)"]
-        )
-        data["TechnicalReplicate"] = pd.to_numeric(
-            data["TechnicalReplicate"], errors="coerce"
-        )
-        data = data[data["TechnicalReplicate"] <= 1]
-        # Set the remaining "TechnicalReplicate" values to 0
-        data["TechnicalReplicate"] = 0
-        # Assign the merged data back to self.raw_data
-        return data
-
-    def preserve_technical_replicates(self):
-        """
-        Preserves the technical replicates in the data.
-
-        :return: DataFrame with preserved technical replicates.
-        """
-        data = self.raw_data.copy()
-        data["Treatment_Replicate"] = (
-            data["Treatment"]
-            + "_"
-            + data["ExperimentalReplicate"].astype(str)
-            + "_"
-            + data["TechnicalReplicate"].astype(str)
-        )
-        return data
-
-    def calc_growth_rate(self, data):
-        """
-        Calculates the growth rate by taking the difference in NormalizedSpeckFormation between consecutive time points.
-
-        :param data: DataFrame containing the normalized data.
-        :return: DataFrame with growth rate data.
-        """
-        growth_rate = data.copy()
-        growth_rate["GrowthRate"] = growth_rate.groupby(
-            ["Treatment", "Treatment_Replicate"]
-        )["NormalizedSpeckFormation"].diff()
-        data["GrowthRate"] = growth_rate["GrowthRate"]
-        return data

@@ -1,0 +1,16 @@
+axes reversed? Speck formation on ATP should be the lower numbers
+Also start the axes at 1 on both sides
+
+
+With ArbMax calcs, also do realmax (C1, D1, etc)
+
+Cyto:
+	Is max different than start
+	If yes, what time did it become significant?
+	
+	Figure out at what times there is a difference in ratio between treatments
+	
+
+Replace bootstrap with a library-based thing instead of your own shit
+
+	

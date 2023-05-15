@@ -42,7 +42,7 @@ def bootstrap_t_test(array1, array2, n_bootstrap=1000, ci=0.95):
     p_value = (
         np.sum(np.abs(bootstrap_mean_diffs) >= np.abs(observed_mean_diff)) / n_bootstrap
     )
-
+    
     # Calculate confidence interval
     lower_bound = np.percentile(bootstrap_mean_diffs, (1 - ci) / 2 * 100)
     upper_bound = np.percentile(bootstrap_mean_diffs, (1 + ci) / 2 * 100)
@@ -289,7 +289,7 @@ class analysis_module:
         ##If the model's data does not have two analytes, return an error
         if len(model.data["Analyte"].unique()) < 2:
             raise ValueError("Model does not have two analytes.")
-        df1, df2 = self.split_analytes(model).values()
+        df2, df1 = self.split_analytes(model).values()
         analyte1, analyte2 = self.split_analytes(model).keys()
         merged_data = pd.merge(
             df1, df2, on=["Treatment", "Time (hrs)", "Experimental_Replicate"]
@@ -319,7 +319,7 @@ class analysis_module:
         analytes = module.data["Analyte"].unique()
         split_data = {}
         for analyte in analytes:
-            split_data[analyte] = module.data[model.data["Analyte"] == analyte]
+            split_data[analyte] = module.data[module.data["Analyte"] == analyte]
         return split_data
 
     def plot_lineplot(

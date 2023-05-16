@@ -21,27 +21,21 @@ speck = time_sequence_module(
 )
 speck.structure_data("SpeckFormation")
 speck.data = speck.limit_data(speck.data, time_limits=time_limits)
+speck.data = speck.data[
+    ~(
+        (speck.data["Treatment"].str.contains("MCC950"))
+        & (speck.data["Experimental_Replicate"] == "1")
+    )
+]
 
-speck.data[speck.data["Treatment"]=="Nigericin"]["Measurement"]
+
+speck.data[speck.data["Treatment"] == "Nigericin"]["Measurement"]
 cyto.data
 
 TAS = analysis_module([cyto, speck])
+TAS.time_compare()
 
-TAS.plot_ratio(TAS.modules["TS_Cyto"], normalize_start=True)
-#set 1 is analyte IL18 at time 23
-data = TAS.modules["TS_Speck"].data
-set1 = data[(data["Treatment"]=="ATP") & (data["Time (hrs)"] == 20.0)]
-
-
-data = set1["Normalized_Measurement"]
-# Calculate mean
-mean = np.mean(data)
-
-# Calculate standard error
-se = np.std(data) / np.sqrt(len(data))
-
-print("Mean:", mean)
-print("Standard Error:", se)
+TAS.plot_ratio(TAS.modules["TS_Cyto"], normalize_start=True, invert=False)
 
 ## Create Summaries
 for module in TAS.modules:
@@ -53,6 +47,9 @@ for module in [module for module in TAS.modules if TAS.modules[module].comp.modi
         Path("reports", "".join(["modifier_impact_", module, ".xlsx"])), header=False
     )
 
+## Create Time Point Comparisons
+for module in TAS.modules:
+    TAS.aggregate_time_comparisons(TAS.modules[module])
 
 ##Line Plots of Speck Data With and Without Modifiers
 module = TAS.modules["TS_Speck"]

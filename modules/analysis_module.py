@@ -9,6 +9,9 @@ from itertools import combinations
 from itertools import product
 from scipy.stats import f_oneway
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
+import bootstrapped.bootstrap as bs
+import bootstrapped.compare_functions as bs_compare
+import bootstrapped.stats_functions as bs_stats
 
 
 def polynomial(x, *coeffs):
@@ -42,13 +45,87 @@ def bootstrap_t_test(array1, array2, n_bootstrap=1000, ci=0.95):
     p_value = (
         np.sum(np.abs(bootstrap_mean_diffs) >= np.abs(observed_mean_diff)) / n_bootstrap
     )
-    
-    # Calculate confidence interval
-    lower_bound = np.percentile(bootstrap_mean_diffs, (1 - ci) / 2 * 100)
-    upper_bound = np.percentile(bootstrap_mean_diffs, (1 + ci) / 2 * 100)
-    confidence_interval = (round(lower_bound, 3), round(upper_bound, 3))
+
+    # Confidence interval info
+    dfcol1 = array1
+    dfcol2 = array2
+    diffs = []
+    for i in range(n_bootsrap):
+        dfcol1, dfcol2 = equalize_series_lengths(dfcol1, dfcol2)
+        diff = np.array(dfcol1) - np.array(dfcol2)
+        diffs.append((diff))
+    diffs_mean = np.mean(diffs, axis=0)
+    bs_result = bs.bootstrap(diffs_mean, stat_func=bs_stats.mean)
+
+    confidence_interval = (
+        round(bs_result.lower_bound, 3),
+        round(bs_result.upper_bound, 3),
+    )
+    # # Calculate confidence interval
+    # lower_bound = np.percentile(bootstrap_mean_diffs, (1 - ci) / 2 * 100)
+    # upper_bound = np.percentile(bootstrap_mean_diffs, (1 + ci) / 2 * 100)
+    # confidence_interval = (round(lower_bound, 3), round(upper_bound, 3))
+
+    # # Calculate confidence interval
+    # sorted_bootstrap_mean_diffs = np.sort(bootstrap_mean_diffs)
+    # lower_bound_index = int((1 - ci) / 2 * n_bootstrap)
+    # upper_bound_index = int((1 + ci) / 2 * n_bootstrap)
+    # lower_bound = sorted_bootstrap_mean_diffs[lower_bound_index]
+    # upper_bound = sorted_bootstrap_mean_diffs[upper_bound_index]
+    # confidence_interval = (round(lower_bound, 3), round(upper_bound, 3))
 
     return p_value, confidence_interval
+
+
+# def equalize_series_lengths(series1, series2):
+#     if len(series1) < len(series2):
+#         series1 = series1.sample(len(series2), replace=True)
+#     elif len(series2) < len(series1):
+#         series2 = series2.sample(len(series1), replace=True)
+#     return series1, series2
+
+
+# def bootstrap_t_test(dfcol1, dfcol2, n_bootsrap=10000):
+#     # merge arrays
+#     diffs = []
+#     for i in range(n_bootsrap):
+#         dfcol1, dfcol2 = equalize_series_lengths(dfcol1, dfcol2)
+#         diff = np.array(dfcol1) - np.array(dfcol2)
+#         diffs.append((diff))
+#     diffs_mean = np.mean(diffs, axis=0)
+#     bs_result = bs.bootstrap(diffs_mean, stat_func=bs_stats.mean)
+
+#     diffs = np.array(diffs)
+#     diff_observed = np.mean(dfcol1) - np.mean(dfcol2)
+
+#     # Two-tailed p-value
+#     p_value = 2 * np.mean(diffs >= np.abs(diff_observed))
+
+#     # Print the bootstrap estimate of the mean difference and the 95% confidence interval
+#     print(f"Bootstrap Mean Difference: {bs_result.value:.3f}")
+#     print(
+#         f"95% Confidence Interval: ({bs_result.lower_bound:.3f}, {bs_result.upper_bound:.3f})"
+#     )
+
+#     # concat = np.concatenate((dfcol1, dfcol2))
+#     # num_greater = 0.0
+#     # num_permutations = n_bootsrap
+#     # diff_observed = np.abs(np.mean(dfcol1) - np.mean(dfcol2))
+
+#     # for _ in range(num_permutations):
+#     #     perm = np.random.permutation(concat)
+#     #     perm_list1 = perm[: len(dfcol1)]
+#     #     perm_list2 = perm[len(dfcol2) :]
+#     #     diff_perm = np.abs(np.mean(perm_list1) - np.mean(perm_list2))
+#     #     if diff_perm > diff_observed:
+#     #         num_greater += 1
+
+#     # p_value = num_greater / num_permutations
+#     confidence_interval = (
+#         round(bs_result.lower_bound, 3),
+#         round(bs_result.upper_bound, 3),
+#     )
+#     return [p_value, confidence_interval]
 
 
 def mean_confidence_interval(data, confidence=0.95):
@@ -126,6 +203,11 @@ class analysis_module:
                         "Max_Factor",
                     ],
                 )
+                max_factor = max_factor.drop_duplicates(
+                    subset=["Analyte", "Treatment", "Experimental_Replicate"],
+                    keep="first",
+                )
+
                 # Sort the resulting DataFrame by (Analyte, Treatment, Experimental_Replicate)
                 sorted_data = max_factor.sort_values(
                     by=["Analyte", "Treatment", "Experimental_Replicate"]
@@ -223,6 +305,47 @@ class analysis_module:
             # results.set_index("Time", inplace=True)
         return results
 
+    def aggregate_time_comparisons(
+        self, module, output_directory: Path = Path("reports"), time1: float = 0
+    ):
+        # Get a list of all treatments, including modified treatments
+        treatments = [treatment for treatment in module.data["Treatment"].unique()]
+        analytes = [analyte for analyte in module.data["Analyte"].unique()]
+        # Initialize an empty dictionary to store the significant times for each treatment
+        significant_times = {}
+        filename = output_directory / f"{module.name}_significant_times.xlsx"
+
+        for analyte in analytes:
+            data = module.data[module.data["Analyte"] == analyte]
+            # Iterate over each treatment
+            for treatment in treatments:
+                # Calculate the time range with a significant difference from zero count
+                table = self.time_point_comparison(treatment, analyte, module)
+                significant_range = (
+                    table[table["P-Value"] < 0.05].Time.min(),
+                    table[table["P-Value"] < 0.05].Time.max(),
+                )
+
+                # Store the significant times in the dictionary
+                significant_times[treatment] = significant_range
+
+                # Write the significant times to the report
+                print(
+                    f"{treatment} is significant between {significant_range[0]} and {significant_range[1]}."
+                )
+
+                sheet_name = treatment
+                if len(analytes) > 1:
+                    sheet_name = str(analyte + "_" + treatment)
+                # Write the significant times to an Excel file
+                # If filename doesn't exist, create it
+                if not filename.exists():
+                    table.to_excel(filename, sheet_name=sheet_name, index=True)
+                with pd.ExcelWriter(
+                    filename, mode="a", if_sheet_exists="replace"
+                ) as writer:
+                    table.to_excel(writer, sheet_name=sheet_name, index=True)
+
     def create_summary_table(self, module=None):
         """
         Creates a summary table with treatment statistics including max measurement, max change rate, and time to max values.
@@ -252,7 +375,16 @@ class analysis_module:
                     (module.Max_Normalized_Measurement["Treatment"] == treatment)
                     & (module.Max_Normalized_Measurement["Analyte"] == analyte)
                 ]
+                time_0_set = module.data[
+                    (module.data["Treatment"] == treatment)
+                    & (module.data["Analyte"] == analyte)
+                    & (module.data["Time (hrs)"] == 0)
+                ]
                 max_measurement = set["Measurement"].mean()
+
+                max_measuremnt_p, ci = bootstrap_t_test(
+                    time_0_set["Measurement"], set["Measurement"]
+                )
                 max_measurement_normalized = set["Normalized_Measurement"].mean()
                 time_to_max_measurement = set["Time (hrs)"].mean()
                 tset = module.Max_Change_Rate[
@@ -267,6 +399,7 @@ class analysis_module:
                         "Analyte": analyte,
                         "Treatment": treatment,
                         "Max Measurement": max_measurement,
+                        "Max Measurement P-Value": max_measuremnt_p,
                         "Max Measurement (Normalized)": max_measurement_normalized,
                         "Max Change Rate": max_change_rate,
                         "Max Change Rate (Normalized)": max_change_rate_normalized,
@@ -281,15 +414,14 @@ class analysis_module:
         return summary
 
     def plot_ratio(
-        self,
-        model,
-        measurement_type="Measurement",
-        normalize_start=False,
+        self, model, measurement_type="Measurement", normalize_start=False, invert=False
     ):
         ##If the model's data does not have two analytes, return an error
         if len(model.data["Analyte"].unique()) < 2:
             raise ValueError("Model does not have two analytes.")
-        df2, df1 = self.split_analytes(model).values()
+        df1, df2 = self.split_analytes(model).values()
+        if invert == True:
+            df1, df2 = df2, df1
         analyte1, analyte2 = self.split_analytes(model).keys()
         merged_data = pd.merge(
             df1, df2, on=["Treatment", "Time (hrs)", "Experimental_Replicate"]
@@ -328,12 +460,21 @@ class analysis_module:
         y: str,
         x: str = "Time (hrs)",
         hue: str = "Treatment",
+        hue_order: List = None,
         errorbar: str = "se",
         filepath: str = None,
         show_p=False,
     ):
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.lineplot(data=dataframe, x=x, y=y, hue=hue, errorbar=errorbar, ax=ax)
+        sns.lineplot(
+            data=dataframe,
+            x=x,
+            y=y,
+            hue=hue,
+            hue_order=hue_order,
+            errorbar=errorbar,
+            ax=ax,
+        )
         ax.set_xlabel(x)
         ax.set_ylabel(y)
         ax.set_title(f"{y} Over Time")
@@ -360,9 +501,9 @@ class analysis_module:
             dfA = modelA.data[modelA.data["Treatment"] == treatment]
             dfB = modelB.data[modelB.data["Treatment"] == treatment]
             fig, ax = plt.subplots(figsize=(10, 6))
-            ax.set_ylabel("Normalized Cytokine Measurement")
+            ax.set_ylabel("Normalized Speck Formation")
             ax2 = ax.twinx()
-            ax2.set_ylabel("Normalized Speck Formation")
+            ax2.set_ylabel("Normalized Cytokine Measurement")
             for model in [dfA, dfB]:
                 ax_to_use = ax if model is dfA else ax2
                 if len(model["Analyte"].unique()) > 1:
@@ -383,6 +524,8 @@ class analysis_module:
                         ax=ax_to_use,
                         errorbar="se",
                     )
+            ax.set_ylim(1, None)  # Set the lower limit of ax's y-axis to 1
+            ax2.set_ylim(1, None)  # Set the lower limit of ax2's y-axis to 1
             plt.xlabel("Time (hrs)")
             # plt.ylabel("Normalized Value")
             plt.title(
@@ -433,11 +576,24 @@ class analysis_module:
         else:
             y = "Normalized_Measurement"
 
+        # Specify the order of treatments to control the colors
+        hue_order = None  # Initialize hue_order as None
+
+        if hue == "Treatment":
+            hue_order = treatments  # Set hue_order only when hue is "Treatment"
+
         if output_path is not None:
             filename = output_path / f"{module.name}_{'_'.join(treatments)}.png"
-            self.plot_lineplot(data, y=y, hue=hue, filepath=filename, show_p=show_p)
+            self.plot_lineplot(
+                data,
+                y=y,
+                hue=hue,
+                hue_order=hue_order,
+                filepath=filename,
+                show_p=show_p,
+            )
         else:
-            self.plot_lineplot(data, y=y, hue=hue, show_p=show_p)
+            self.plot_lineplot(data, y=y, hue=hue, hue_order=hue_order, show_p=show_p)
 
     def show_p(self, data, y, separator, ax):
         # Get the current ylim values

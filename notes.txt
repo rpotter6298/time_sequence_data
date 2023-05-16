@@ -1,16 +1,21 @@
-axes reversed? Speck formation on ATP should be the lower numbers
-Also start the axes at 1 on both sides
+axes reversed? Speck formation on ATP should be the lower numbers -done
+Also start the axes at 1 on both sides - done
 
 
 With ArbMax calcs, also do realmax (C1, D1, etc)
 
 Cyto:
-	Is max different than start
-	If yes, what time did it become significant?
+	Is max different than start - added to summary as Max Measurement P-Value
+	If yes, what time did it become significant? - created time point comparisons report
 	
 	Figure out at what times there is a difference in ratio between treatments
 	
 
-Replace bootstrap with a library-based thing instead of your own shit
+Replace bootstrap with a library-based thing instead of your own shit - done
 
 	
+++ Summary Table is the p-value which compares the difference between the set of numbers that are time 0 with the set of numbers which correspond to the maximum value for EACH replicate. 
+In other words "Are the peaks significantly different from the start"
+Conversely, significant times table evaluates this on a strictly per-time bases so the curves are not aligned between replicates (especially ATP).
+This is more of a "At any given time can we confirm significant changes"
+These give different answers, so it took me a while to figure out why that was.

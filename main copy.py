@@ -12,7 +12,7 @@ cyto = time_sequence_module(
     Cytokine_Adapter("Cyto", base_treatments, short_name_dict=short_name_dict)
 )
 cyto.structure_data("Concentration")
-cyto.data = cyto.limit_data(cyto.data, time_limits=time_limits)
+# cyto.data = cyto.limit_data(cyto.data, time_limits=time_limits)
 
 speck = time_sequence_module(
     Count_Aggregator(
@@ -34,6 +34,9 @@ cyto.data
 
 TAS = analysis_module([cyto, speck])
 TAS.time_compare()
+
+# module = TAS.modules["TS_Cyto"]
+# module.data[(module.data["Analyte"]=="IL18") & (module.data["Treatment"]=="MSU")].to_excel("Output.xlsx")
 
 TAS.plot_ratio(TAS.modules["TS_Cyto"], normalize_start=True, invert=False)
 
@@ -57,6 +60,12 @@ for treatment in module.data["Treatment"].unique():
     TAS.plot_speck_lineplots(
         module, [treatment], output_path=Path("plots", "speck_plots"), show_p=True
     )
+
+for treatment in module.data["Treatment"].unique():
+    dict = TAS.prepare_lineplot(module, [treatment])
+    plotting_module.plot_lineplot(**dict)
+
+
 for treatment in module.comp.treatments:
     mod_treat = "_".join([module.comp.modifier, treatment])
     TAS.plot_speck_lineplots(

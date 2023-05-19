@@ -1,4 +1,5 @@
 from typing import Type, List, Dict, Any
+from modules.stats_functions import *
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -9,138 +10,6 @@ from itertools import combinations
 from itertools import product
 from scipy.stats import f_oneway
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
-import bootstrapped.bootstrap as bs
-import bootstrapped.compare_functions as bs_compare
-import bootstrapped.stats_functions as bs_stats
-
-
-def polynomial(x, *coeffs):
-    return np.polyval(coeffs, x)
-
-
-def cosine_similarity(v1, v2):
-    dot_product = np.dot(v1, v2)
-    norm_v1 = np.linalg.norm(v1)
-    norm_v2 = np.linalg.norm(v2)
-    return dot_product / (norm_v1 * norm_v2)
-
-
-def bootstrap_t_test(array1, array2, n_bootstrap=1000, ci=0.95):
-    # Calculate the observed mean difference
-    observed_mean_diff = np.mean(array1) - np.mean(array2)
-
-    # Combine the two arrays
-    combined_array = np.concatenate((array1, array2))
-
-    # Perform bootstrapping
-    bootstrap_mean_diffs = []
-    for _ in range(n_bootstrap):
-        np.random.shuffle(combined_array)
-        sample1 = combined_array[: len(array1)]
-        sample2 = combined_array[len(array1) :]
-        bootstrap_mean_diff = np.mean(sample1) - np.mean(sample2)
-        bootstrap_mean_diffs.append(bootstrap_mean_diff)
-
-    # Calculate p-value
-    p_value = (
-        np.sum(np.abs(bootstrap_mean_diffs) >= np.abs(observed_mean_diff)) / n_bootstrap
-    )
-
-    # Confidence interval info
-    dfcol1 = array1
-    dfcol2 = array2
-    diffs = []
-    for i in range(n_bootsrap):
-        dfcol1, dfcol2 = equalize_series_lengths(dfcol1, dfcol2)
-        diff = np.array(dfcol1) - np.array(dfcol2)
-        diffs.append((diff))
-    diffs_mean = np.mean(diffs, axis=0)
-    bs_result = bs.bootstrap(diffs_mean, stat_func=bs_stats.mean)
-
-    confidence_interval = (
-        round(bs_result.lower_bound, 3),
-        round(bs_result.upper_bound, 3),
-    )
-    # # Calculate confidence interval
-    # lower_bound = np.percentile(bootstrap_mean_diffs, (1 - ci) / 2 * 100)
-    # upper_bound = np.percentile(bootstrap_mean_diffs, (1 + ci) / 2 * 100)
-    # confidence_interval = (round(lower_bound, 3), round(upper_bound, 3))
-
-    # # Calculate confidence interval
-    # sorted_bootstrap_mean_diffs = np.sort(bootstrap_mean_diffs)
-    # lower_bound_index = int((1 - ci) / 2 * n_bootstrap)
-    # upper_bound_index = int((1 + ci) / 2 * n_bootstrap)
-    # lower_bound = sorted_bootstrap_mean_diffs[lower_bound_index]
-    # upper_bound = sorted_bootstrap_mean_diffs[upper_bound_index]
-    # confidence_interval = (round(lower_bound, 3), round(upper_bound, 3))
-
-    return p_value, confidence_interval
-
-
-# def equalize_series_lengths(series1, series2):
-#     if len(series1) < len(series2):
-#         series1 = series1.sample(len(series2), replace=True)
-#     elif len(series2) < len(series1):
-#         series2 = series2.sample(len(series1), replace=True)
-#     return series1, series2
-
-
-# def bootstrap_t_test(dfcol1, dfcol2, n_bootsrap=10000):
-#     # merge arrays
-#     diffs = []
-#     for i in range(n_bootsrap):
-#         dfcol1, dfcol2 = equalize_series_lengths(dfcol1, dfcol2)
-#         diff = np.array(dfcol1) - np.array(dfcol2)
-#         diffs.append((diff))
-#     diffs_mean = np.mean(diffs, axis=0)
-#     bs_result = bs.bootstrap(diffs_mean, stat_func=bs_stats.mean)
-
-#     diffs = np.array(diffs)
-#     diff_observed = np.mean(dfcol1) - np.mean(dfcol2)
-
-#     # Two-tailed p-value
-#     p_value = 2 * np.mean(diffs >= np.abs(diff_observed))
-
-#     # Print the bootstrap estimate of the mean difference and the 95% confidence interval
-#     print(f"Bootstrap Mean Difference: {bs_result.value:.3f}")
-#     print(
-#         f"95% Confidence Interval: ({bs_result.lower_bound:.3f}, {bs_result.upper_bound:.3f})"
-#     )
-
-#     # concat = np.concatenate((dfcol1, dfcol2))
-#     # num_greater = 0.0
-#     # num_permutations = n_bootsrap
-#     # diff_observed = np.abs(np.mean(dfcol1) - np.mean(dfcol2))
-
-#     # for _ in range(num_permutations):
-#     #     perm = np.random.permutation(concat)
-#     #     perm_list1 = perm[: len(dfcol1)]
-#     #     perm_list2 = perm[len(dfcol2) :]
-#     #     diff_perm = np.abs(np.mean(perm_list1) - np.mean(perm_list2))
-#     #     if diff_perm > diff_observed:
-#     #         num_greater += 1
-
-#     # p_value = num_greater / num_permutations
-#     confidence_interval = (
-#         round(bs_result.lower_bound, 3),
-#         round(bs_result.upper_bound, 3),
-#     )
-#     return [p_value, confidence_interval]
-
-
-def mean_confidence_interval(data, confidence=0.95):
-    a = 1.0 * np.array(data)
-    n = len(a)
-    mean, se = np.mean(a), scipy.stats.sem(a)
-    h = se * scipy.stats.t.ppf((1 + confidence) / 2.0, n - 1)
-    return mean, (mean - h, mean + h)
-
-
-def mean_standard_error(data):
-    a = 1.0 * np.array(data)
-    n = len(a)
-    mean, se = np.mean(a), scipy.stats.sem(a)
-    return mean, se
 
 
 class arbitrary_max:
@@ -413,31 +282,6 @@ class analysis_module:
                 summary = pd.concat([summary, new_row], ignore_index=True)
         return summary
 
-    def plot_ratio(
-        self, model, measurement_type="Measurement", normalize_start=False, invert=False
-    ):
-        ##If the model's data does not have two analytes, return an error
-        if len(model.data["Analyte"].unique()) < 2:
-            raise ValueError("Model does not have two analytes.")
-        df1, df2 = self.split_analytes(model).values()
-        if invert == True:
-            df1, df2 = df2, df1
-        analyte1, analyte2 = self.split_analytes(model).keys()
-        merged_data = pd.merge(
-            df1, df2, on=["Treatment", "Time (hrs)", "Experimental_Replicate"]
-        )
-        merged_data[f"Ratio_{analyte1}_{analyte2}"] = (
-            merged_data[f"{measurement_type}_x"] / merged_data[f"{measurement_type}_y"]
-        )
-        # If normalize_start is True, normalize the ratio to the first time point for each treatment and experimental replicate
-        if normalize_start:
-            merged_data[f"Ratio_{analyte1}_{analyte2}"] = merged_data.groupby(
-                ["Treatment", "Experimental_Replicate"]
-            )[f"Ratio_{analyte1}_{analyte2}"].transform(lambda x: x / x.iloc[0])
-
-        self.plot_lineplot(merged_data, y=f"Ratio_{analyte1}_{analyte2}", errorbar="se")
-        return merged_data
-
     def split_analytes(self, module):
         """
         Split the data into separate dataframes for each analyte.
@@ -454,111 +298,23 @@ class analysis_module:
             split_data[analyte] = module.data[module.data["Analyte"] == analyte]
         return split_data
 
-    def plot_lineplot(
-        self,
-        dataframe: pd.DataFrame,
-        y: str,
-        x: str = "Time (hrs)",
-        hue: str = "Treatment",
-        hue_order: List = None,
-        errorbar: str = "se",
-        filepath: str = None,
-        show_p=False,
-    ):
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.lineplot(
-            data=dataframe,
-            x=x,
-            y=y,
-            hue=hue,
-            hue_order=hue_order,
-            errorbar=errorbar,
-            ax=ax,
-        )
-        ax.set_xlabel(x)
-        ax.set_ylabel(y)
-        ax.set_title(f"{y} Over Time")
-        ax.legend()
-        if show_p == True:
-            ax = self.show_p(data=dataframe, y=y, separator=hue, ax=ax)
-        if filepath is not None:
-            plt.savefig(filepath, dpi=300, bbox_inches="tight")
-            plt.close()
-        else:
-            plt.show()
-
-    def plot_multimodel(
-        self,
-        modelA,
-        modelB,
-        measurement_type="Normalized_Measurement",
-        output_directory=None,
-    ):
-        ##Confirm that ModelA and ModelB have the same treatments
-        if modelA.comp.treatments != modelB.comp.treatments:
-            raise ValueError("Models do not have the same treatments.")
-        for treatment in modelA.comp.treatments:
-            dfA = modelA.data[modelA.data["Treatment"] == treatment]
-            dfB = modelB.data[modelB.data["Treatment"] == treatment]
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.set_ylabel("Normalized Speck Formation")
-            ax2 = ax.twinx()
-            ax2.set_ylabel("Normalized Cytokine Measurement")
-            for model in [dfA, dfB]:
-                ax_to_use = ax if model is dfA else ax2
-                if len(model["Analyte"].unique()) > 1:
-                    sns.lineplot(
-                        data=model,
-                        x="Time (hrs)",
-                        y=measurement_type,
-                        hue="Analyte",
-                        ax=ax_to_use,
-                        errorbar="se",
-                    )
-                else:
-                    sns.lineplot(
-                        data=model,
-                        x="Time (hrs)",
-                        y=measurement_type,
-                        color="green",
-                        ax=ax_to_use,
-                        errorbar="se",
-                    )
-            ax.set_ylim(1, None)  # Set the lower limit of ax's y-axis to 1
-            ax2.set_ylim(1, None)  # Set the lower limit of ax2's y-axis to 1
-            plt.xlabel("Time (hrs)")
-            # plt.ylabel("Normalized Value")
-            plt.title(
-                str(
-                    "Normalized Measurements for IL1b, IL18, and Normalized Speck Formation - "
-                    + treatment
-                )
-            )
-            if output_directory is not None:
-                filepath = output_directory / f"{treatment}_multimodel.png"
-                plt.savefig(filepath, dpi=300, bbox_inches="tight")
-                plt.close()
-            else:
-                plt.show()
-
-    def plot_speck_lineplots(
+    def prepare_lineplot(
         self,
         module,
         treatments: List = None,
         output_path: Path = None,
-        show_p=False,
+        measurement_type=None,
+        analyte_selection=None,
     ):
-        """
-        Creates a line plot of the normalized speck formation over time, separated by treatment type.
-
-        """
         if treatments is None:
             treatments = module.comp.treatments
-
+        if treatments == "all":
+            treatments = module.data["Treatment"].unique()
         data = module.data[
             module.data["Treatment"].isin(treatments)
         ]  # Filter the data to only include the specified treatments
-
+        if analyte_selection is not None:
+            data = data[data["Analyte"].isin(analyte_selection)]
         # Check if there is only one treatment and multiple analytes
         if len(treatments) == 1 and len(data.Analyte.unique()) > 1:
             hue = "Analyte"
@@ -570,8 +326,9 @@ class analysis_module:
             raise ValueError(
                 "Must specify either one treatment and multiple analytes, or one analyte and multiple treatments."
             )
-
-        if len(data[hue].unique()) == 1:
+        if measurement_type:
+            y = measurement_type
+        elif len(data[hue].unique()) == 1:
             y = "Measurement"
         else:
             y = "Normalized_Measurement"
@@ -584,62 +341,21 @@ class analysis_module:
 
         if output_path is not None:
             filename = output_path / f"{module.name}_{'_'.join(treatments)}.png"
-            self.plot_lineplot(
-                data,
-                y=y,
-                hue=hue,
-                hue_order=hue_order,
-                filepath=filename,
-                show_p=show_p,
-            )
+            lineplot_dict = {
+                "dataframe": data,
+                "y": y,
+                "hue": hue,
+                "hue_order": hue_order,
+                "filepath": filename,
+            }
         else:
-            self.plot_lineplot(data, y=y, hue=hue, hue_order=hue_order, show_p=show_p)
-
-    def show_p(self, data, y, separator, ax):
-        # Get the current ylim values
-        ymin, ymax = ax.get_ylim()
-        # Set the new ylim with an increased upper limit
-        ax.set_ylim(ymin, ymax * 1.25)
-        # Get the treatments in the data
-        treatments = data[separator].unique()
-        p_values_text = ""
-        for treatment in treatments:
-            treatment_data = data[data[separator] == treatment]
-            max_time = treatment_data.loc[treatment_data[y].idxmax(), "Time (hrs)"]
-
-            # max_time_per_replicate = (
-            #     treatment_data.groupby("Experimental_Replicate")[y]
-            #     .idxmax()
-            #     .reset_index()
-            # )
-            # # Merge the original treatment_data with max_time_per_replicate to get the values for each replicate at their max times
-            # max_values_per_replicate = treatment_data.loc[max_time_per_replicate[y]]
-            # # Filter the max_values_per_replicate DataFrame for the current treatment
-            # treatment_max_values = max_values_per_replicate[
-            #     max_values_per_replicate[separator] == treatment
-            # ]
-
-            time_zero_data = np.array(
-                treatment_data[treatment_data["Time (hrs)"] == 0][y]
-            )
-            max_time_data = np.array(
-                treatment_data[treatment_data["Time (hrs)"] == max_time][y]
-            )
-            # print(time_zero_data, max_time_data)
-            p, ci = bootstrap_t_test(max_time_data, time_zero_data)
-            # print(p)
-            p_values_text += f"{treatment} (Max = {max_time} hrs):\n p = {p:.4f}\n"
-
-        ax.text(
-            0.02,
-            0.98,
-            p_values_text,
-            transform=ax.transAxes,
-            fontsize=10,
-            verticalalignment="top",
-            horizontalalignment="left",
-        )
-        return ax
+            lineplot_dict = {
+                "dataframe": data,
+                "y": y,
+                "hue": hue,
+                "hue_order": hue_order,
+            }
+        return lineplot_dict
 
     def find_arbitrary_max(self, module):
         self.time_compare()
@@ -770,89 +486,6 @@ class analysis_module:
                 }
         return comparison_results
 
-    # def compare_max_time_distances(self, moduleA, moduleB):
-    #     # Get tlist of all treatments which appear in both moduleA and moduleB data
-    #     def get_times_by_treatment_analyte(df):
-    #         result = {}
-    #         analytes = df["Analyte"].unique()
-
-    #         for analyte in analytes:
-    #             analyte_dict = {}
-    #             for treatment in df["Treatment"].unique():
-    #                 times = df[
-    #                     (df["Treatment"] == treatment) & (df["Analyte"] == analyte)
-    #                 ]["Time (hrs)"].tolist()
-    #                 analyte_dict[treatment] = times
-    #             result[analyte] = analyte_dict
-
-    #         return result
-
-    #     max_A = get_times_by_treatment_analyte(moduleA.Max_Normalized_Measurement)
-    #     max_B = get_times_by_treatment_analyte(moduleB.Max_Normalized_Measurement)
-
-    #     treatments = list(
-    #         set(moduleA.data["Treatment"].unique()).intersection(
-    #             set(moduleB.data["Treatment"].unique())
-    #         )
-    #     )
-    #     results = {}
-    #     if len(max_A) == 1:
-    #         max_A = {moduleA.name: max_A[next(iter(max_A.keys()))]}
-    #     if len(max_B) == 1:
-    #         max_B = {moduleB.name: max_B[next(iter(max_B.keys()))]}
-    #     for treatment in treatments:
-    #         for analyte_A, times_A in max_A.items():
-    #             name_A = analyte_A
-    #             for analyte_B, times_B in max_B.items():
-    #                 name_B = analyte_B
-    #                 key = f"{name_A}-{name_B}_{treatment}"
-
-    #                 # T-test
-    #                 t_stat, p_val = scipy.stats.ttest_ind(
-    #                     times_A[treatment], times_B[treatment]
-    #                 )
-    #                 # Mean difference with CI
-    #                 mean_A, se_A = mean_standard_error(times_A[treatment])
-    #                 mean_B, se_B = mean_standard_error(times_B[treatment])
-
-    #                 mean_diff = mean_A - mean_B
-    #                 se_diff = np.sqrt(se_A**2 + se_B**2)
-    #                 ci_diff = scipy.stats.t.interval(
-    #                     0.95,
-    #                     len(times_A[treatment]) + len(times_B[treatment]) - 2,
-    #                     loc=mean_diff,
-    #                     scale=se_diff,
-    #                 )
-    #                 results[key] = {
-    #                     "t_stat": t_stat,
-    #                     "p_val": p_val,
-    #                     "mean_diff": mean_diff,
-    #                     "ci_diff": ci_diff,
-    #                 }
-
-    #     comparison_results = {}
-    #     pairwise_combinations = list(product(list(max_A.keys()), list(max_B.keys())))
-    #     for pair in pairwise_combinations:
-    #         prefix = f"{pair[0]}-{pair[1]}"
-    #         for treatment_combination in combinations(treatments, 2):
-    #             option1 = f"{prefix}_{treatment_combination[0]}"
-    #             option2 = f"{prefix}_{treatment_combination[1]}"
-    #             t_stat_diff = results[option1]["t_stat"] - results[option2]["t_stat"]
-    #             mean_diff_diff, ci_diff_diff = compare_differences(
-    #                 results, option1, option2
-    #             )
-    #             comparison_results[f"{option1}:{option2}"] = {
-    #                 "t_stat_diff": t_stat_diff,
-    #                 "t_significance": min(
-    #                     results[option1]["p_val"], results[option2]["p_val"]
-    #                 )
-    #                 < 0.05,  # change this to use adjusted p-value if multiple comparison correction is applied
-    #                 "mean_diff_diff": mean_diff_diff,
-    #                 "ci_diff_diff": ci_diff_diff,
-    #                 "significance": not (ci_diff_diff[0] <= 0 <= ci_diff_diff[1]),
-    #             }
-    #     return comparison_results
-
     def compare_max_normalized_measurement_anova(self, df):
         anova_results = {}
 
@@ -874,9 +507,54 @@ class analysis_module:
 
         return anova_results
 
+    def compute_ratio(
+        self,
+        module_name,
+        measurement_type="Measurement",
+        normalize_start=False,
+    ):
+        module = self.modules[module_name]
+        ##If the module's data does not have two analytes, return an error
+        if len(module.data["Analyte"].unique()) < 2:
+            raise ValueError("Model does not have two analytes.")
+        self.modules[module_name].ratio_data = {}
+        for analyte_pair in list(combinations(module.data["Analyte"].unique(), 2)):
+            split_data = self.split_analytes(module_name, analyte_pair)
+            df1, df2 = split_data.values()
+            analyte1, analyte2 = split_data.keys()
+            merged_data = pd.merge(
+                df1, df2, on=["Treatment", "Time (hrs)", "Experimental_Replicate"]
+            )
+            merged_data[f"Ratio_{analyte1}_{analyte2}"] = (
+                merged_data[f"{measurement_type}_x"]
+                / merged_data[f"{measurement_type}_y"]
+            )
+            merged_data[f"Ratio_{analyte2}_{analyte1}"] = (
+                merged_data[f"{measurement_type}_y"]
+                / merged_data[f"{measurement_type}_x"]
+            )
 
-# self.time_compare()
-# module = self.modules["TS_Speck"]
-# module.arbitrary_maximums.ATP.window
-# moduleA=TAS.modules["TS_Speck"]
-# moduleB=TAS.modules["TS_Cyto"]
+            # If normalize_start is True, normalize the ratio to the first time point for each treatment and experimental replicate
+            if normalize_start:
+                merged_data[f"Ratio_{analyte1}_{analyte2}"] = merged_data.groupby(
+                    ["Treatment", "Experimental_Replicate"]
+                )[f"Ratio_{analyte1}_{analyte2}"].transform(lambda x: x / x.iloc[0])
+            self.modules[module_name].ratio_data[
+                analyte1 + ":" + analyte2
+            ] = merged_data
+
+    def split_analytes(self, module_name, analyte_pair):
+        """
+        Split the data into separate dataframes for each analyte.
+
+        Args:
+            model (time_sequence): The time_sequence object to split.
+
+        Returns:
+            dict: A dictionary of dataframes for each analyte.
+        """
+        module = self.modules[module_name]
+        split_data = {}
+        for analyte in analyte_pair:
+            split_data[analyte] = module.data[module.data["Analyte"] == analyte]
+        return split_data

@@ -1,13 +1,22 @@
 TAS = analysis_module([cyto, speck])
+from scipy import stats
+import numpy as np
+import bootstrapped.bootstrap as bs
+import bootstrapped.compare_functions as bs_compare
+import bootstrapped.stats_functions as bs_stats
 
 self.modules["TS_Cyto"].Max_Normalized_Measurement
 module = TAS.modules["TS_Cyto"]
 module = TAS.modules["TS_Speck"]
-module.data[
-    (module.data["Treatment"] == "MCC950_MSU")
-    & (module.data["Experimental_Replicate"] == "1")
-]
-module = TAS.modules["TS_Cyto"]
+module.data["Treatment"].unique()
+module.data[(module.data["Treatment"] == "ATP") & (module.data["Time (hrs)"] == 0)]
+
+from modules.plots_module import plotting_module
+
+plotting_module.plot_lineplot(module.data, "Measurement")
+
+
+module = TAS.modules["TS_Speck"]
 TAS.aggregate_time_comparisons(module)
 TAS.plot_ratio(module)
 array1 = array1["Measurement"]
@@ -15,6 +24,71 @@ array1 = array1["Measurement"]
 array2 = array2["Measurement"]
 dfcol2 = array2
 equalize_series_lengths(value, mvalue)
+
+array1 = module.data[
+    (module.data["Treatment"] == "ATP") & (module.data["Time (hrs)"] == 0)
+]["Measurement"]
+array2 = module.data[
+    (module.data["Treatment"] == "ATP") & (module.data["Time (hrs)"] == 1)
+]["Measurement"]
+
+bootstrap_t_test(array1, array2)
+
+val = array1
+grp = array2
+
+
+def equalize_series_lengths(series1, series2):
+    if len(series1) < len(series2):
+        series1 = series1.sample(len(series2), replace=True)
+    elif len(series2) < len(series1):
+        series2 = series2.sample(len(series1), replace=True)
+    return series1, series2
+
+
+def bootstrap_t_test(array1, array2, n_bootstrap=1000):
+    # Combine the two arrays
+    val = np.concatenate((array1, array2))
+    grp = np.array([1] * len(array1) + [2] * len(array2))
+
+    # Calculate the observed t statistic
+    observed_t_stat = stats.ttest_ind(
+        val[grp == 1], val[grp == 2], equal_var=True
+    ).statistic
+
+    # Perform bootstrapping
+    t_values = np.zeros(n_bootstrap)
+    n1 = len(array1)
+    n2 = len(array2)
+    for j in range(n_bootstrap):
+        sample = np.random.choice(val, size=n1 + n2, replace=True)
+        group1 = sample[:n1]
+        group2 = sample[n1 : n1 + n2]
+        if np.std(group1) == 0 or np.std(group2) == 0:
+            t_values[j] = np.nan
+        else:
+            t_values[j] = stats.ttest_ind(group1, group2, equal_var=True).statistic
+
+    # Calculate p-value
+    p_value = np.nanmean(np.abs(t_values) >= np.abs(observed_t_stat))
+
+    # Confidence interval info
+    dfcol1 = val
+    dfcol2 = grp
+    diffs = []
+    for i in range(n_bootstrap):
+        dfcol1, dfcol2 = equalize_series_lengths(dfcol1, dfcol2)
+        diff = np.array(dfcol1) - np.array(dfcol2)
+        diffs.append((diff))
+    diffs_mean = np.mean(diffs, axis=0)
+    bs_result = bs.bootstrap(diffs_mean, stat_func=bs_stats.mean)
+
+    confidence_interval = (
+        round(bs_result.lower_bound, 3),
+        round(bs_result.upper_bound, 3),
+    )
+
+    return p_value, confidence_interval
 
 
 def aggregate_time_comparisons(

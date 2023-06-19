@@ -28,6 +28,12 @@ speck.data = speck.data[
     )
 ]
 
+# count the number samples for each treatment type in speck.data and cyto.data
+for module in [cyto, speck]:
+    for treatment in speck.data.Treatment.unique():
+        subset = speck.data["Treatment" == treatment]
+        print(subset)
+
 
 speck.data[speck.data["Treatment"] == "Nigericin"]["Measurement"]
 cyto.data

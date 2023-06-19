@@ -9,6 +9,9 @@ modifier = "MCC950"
 short_name_dict = {"nig": "Nigericin"}
 time_limits = {"ALL": 21}
 
+temp = Cytokine_Adapter("Cyto", base_treatments, short_name_dict=short_name_dict)
+
+
 cyto = time_sequence_module(
     Cytokine_Adapter("Cyto", base_treatments, short_name_dict=short_name_dict)
 )
@@ -37,6 +40,24 @@ plotting_module.plot_lineplot(
         TAS.modules["TS_Speck"], treatments="all", measurement_type="Measurement"
     )
 )
+## NON-MCC SPECK CURVES IN THE SAME PLOT WITH RAW COUNTS
+plotting_module.plot_lineplot(
+    **TAS.prepare_lineplot(
+        TAS.modules["TS_Speck"],
+        treatments=["ATP", "MSU", "Nigericin"],
+        measurement_type="Measurement",
+    )
+)
+
+plotting_module.plot_lineplot(
+    **TAS.prepare_lineplot(
+        TAS.modules["TS_Speck"],
+        treatments=["MSU", "MCC950_MSU"],
+        measurement_type="Normalized_Measurement",
+    ),
+    errorbar="ci"
+)
+
 ## SEPARATE ATP SPECK CURVE WITH RAW COUNTS
 plotting_module.plot_lineplot(
     **TAS.prepare_lineplot(

@@ -35,10 +35,13 @@ def plot_count_against_ratio(ratio_name, treatments=None, invert=False):
         hue="Treatment",
         ax=ax2,
         palette="pastel",
+        errorbar="se",
     )
+    line_legend = ax.legend(loc='upper left', title= "Speck Formation")
+    point_legend = ax2.legend(loc='upper right', title= "Cytokine Ratio")
     # ax.set_ylim(1, None)  # Set the lower limit of ax's y-axis to 1
     # ax2.set_ylim(1, None)
-    ax.get_legend().remove()  # Set the lower limit of ax2's y-axis to 1
+    #ax.get_legend().remove()  # Set the lower limit of ax2's y-axis to 1
     # for line in pointplot.lines:
     #     line.set_linestyle("dotted")
     plt.xlim(0, 21)

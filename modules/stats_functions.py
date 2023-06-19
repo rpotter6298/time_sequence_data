@@ -2,6 +2,7 @@ import numpy as np
 import bootstrapped.bootstrap as bs
 import bootstrapped.stats_functions as bs_stats
 from scipy import stats
+import scipy
 
 
 def polynomial(x, *coeffs):
@@ -83,3 +84,4 @@ def mean_standard_error(data):
     n = len(a)
     mean, se = np.mean(a), scipy.stats.sem(a)
     return mean, se
+

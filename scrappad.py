@@ -15,7 +15,13 @@ from modules.plots_module import plotting_module
 
 plotting_module.plot_lineplot(module.data, "Measurement")
 
+plotting_module.plot_pointplot(ratio_subset, "Ratio_IL1b_IL18")
+ratio_info = TAS.modules["TS_Cyto"].ratio_data["IL18:IL1b"]
+ratio_subset = ratio_info[ratio_info["Treatment"] == "ATP"]
+ratio_time_slice = ratio_subset[ratio_subset["Time (hrs)"] == 10]
 
+scipy.stats.sem(ratio_time_slice["Ratio_IL18_IL1b"])
+ratio_name = "IL18:IL1b"
 module = TAS.modules["TS_Speck"]
 TAS.aggregate_time_comparisons(module)
 TAS.plot_ratio(module)
@@ -36,6 +42,7 @@ bootstrap_t_test(array1, array2)
 
 val = array1
 grp = array2
+
 
 
 def equalize_series_lengths(series1, series2):

@@ -142,7 +142,9 @@ class plotting_module:
                 plt.show()
 
     @staticmethod
-    def plot_count_against_ratio(ratio_name, treatments=None, invert=False):
+    def plot_count_against_ratio(
+        ratio_name, treatments=None, invert=False, manual_ax_modification=None
+    ):
         speck_info = TAS.modules["TS_Speck"]
         ratio_info = TAS.modules["TS_Cyto"].ratio_data[ratio_name]
         ratio_name_x = ratio_name.split(":")[0]
@@ -167,10 +169,15 @@ class plotting_module:
             errorbar="se",
         )
         if invert == True:
-            ratio_name_x, ratio_name_y = ratio_name_y, ratio_name_x
-
-        y_name = f"Ratio_{ratio_name_x}_{ratio_name_y}"
-        
+            y_name = f"Ratio_{ratio_name_y}_{ratio_name_x}"
+            ax2.set_ylabel(
+                f"Ratio of Cytokine Measurements, {ratio_name_y}:{ratio_name_x}"
+            )
+        else:
+            y_name = f"Ratio_{ratio_name_x}_{ratio_name_y}"
+            ax2.set_ylabel(
+                f"Ratio of Cytokine Measurements, {ratio_name_x}:{ratio_name_y}"
+            )
         pointplot = sns.pointplot(
             data=ratio_data,
             x="Time (hrs)",
@@ -178,24 +185,28 @@ class plotting_module:
             hue="Treatment",
             ax=ax2,
             palette="pastel",
+            errorbar="se",
         )
-        ax2.set_ylabel(
-            f"Ratio: {ratio_name_x}:{ratio_name_y}"
-        )
+        line_legend = ax.legend(loc="upper left", title="Speck Formation")
+        point_legend = ax2.legend(loc="upper right", title="Cytokine Ratio")
+        if manual_ax_modification is not None:
+            manual_ax_modification(
+                ax, ax2
+            )  # Call the callback function with the ax parameter
         # ax.set_ylim(1, None)  # Set the lower limit of ax's y-axis to 1
         # ax2.set_ylim(1, None)
-        ax.get_legend().remove()  # Set the lower limit of ax2's y-axis to 1
+        # ax.get_legend().remove()  # Set the lower limit of ax2's y-axis to 1
         # for line in pointplot.lines:
         #     line.set_linestyle("dotted")
         plt.xlim(0, 21)
         plt.xlabel("Time (hrs)")
 
-        plt.title(
-            str(
-                f"Ratio of {ratio_name_x}:{ratio_name_y} and Speck Formation Counts - "
-                + treatment
-            )
-        )
+        # plt.title(
+        #     str(
+        #         "Normalized Measurements for IL1b, IL18, and Normalized Speck Formation - "
+        #         + treatment
+        #     )
+        # )
         plt.show()
 
     @staticmethod
@@ -248,9 +259,12 @@ class plotting_module:
             analyte1 = analyte_pair.split(":")[0]
             analyte2 = analyte_pair.split(":")[1]
         fig, ax = plotting_module.plot_pointplot(
-            merged_data, y=f"Ratio_{analyte1}_{analyte2}", errorbar="se", manual_ax_modification=manual_ax_modification
+            merged_data,
+            y=f"Ratio_{analyte1}_{analyte2}",
+            errorbar="se",
+            manual_ax_modification=manual_ax_modification,
         )
-        #return fig, ax
+        # return fig, ax
 
     @staticmethod
     def split_analytes(module):

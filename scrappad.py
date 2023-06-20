@@ -44,7 +44,6 @@ val = array1
 grp = array2
 
 
-
 def equalize_series_lengths(series1, series2):
     if len(series1) < len(series2):
         series1 = series1.sample(len(series2), replace=True)
@@ -215,3 +214,102 @@ def new_bootsrap(dfcol1, dfcol2):
         round(bs_result.upper_bound, 3),
     )
     return p_value, confidence_interval
+
+
+cyto = TAS.modules["TS_Cyto"]
+speck = TAS.modules["TS_Speck"]
+# grab only IL18 MSU data
+target = cyto.data[(cyto.data["Analyte"] == "IL18") & (cyto.data["Treatment"] == "MSU")]
+target.to_excel("Output.xlsx")
+
+cyto.data
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+
+def pearsons_compare_change_rate():
+    pass
+
+
+set1 = cyto.data[(cyto.data["Analyte"] == "IL18") & (cyto.data["Treatment"] == "ATP")]
+set2 = speck.data[(speck.data["Treatment"] == "ATP")]
+# Renaming the column from 'Time (hrs)' to 'Time'
+set1 = set1.rename(columns={"Time (hrs)": "Time"})
+set2 = set2.rename(columns={"Time (hrs)": "Time"})
+set1["dataset"] = "set1"
+set2["dataset"] = "set2"
+combined_data = pd.concat([set1, set2])
+combined_data = combined_data[
+    (combined_data["Time"] > 0) & (combined_data["Time"] < 18)
+]
+combined_data.dropna(subset=["Change_Rate"], inplace=True)
+model = smf.mixedlm(
+    "Normalized_Change_Rate ~ Time * dataset",
+    data=combined_data,
+    groups=combined_data["Experimental_Replicate"],
+).fit()
+model.summary()
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Assuming merged_data is the DataFrame with your data
+# and it includes a column 'dataset' indicating set1 or set2
+
+plt.figure(figsize=(10, 6))
+
+# Create a scatter plot with regression lines
+sns.lmplot(
+    x="Time", y="Normalized_Change_Rate", hue="dataset", data=combined_data, ci=None
+)
+
+# Adding titles and labels
+plt.title("Normalized Change Rate vs Time")
+plt.xlabel("Time")
+plt.ylabel("Normalized Change Rate")
+
+# Show plot
+plt.show()
+
+
+merged_data = pd.merge(
+    set1,
+    set2,
+    on=["Time (hrs)", "Experimental_Replicate"],
+    suffixes=("_cytokine", "_speck"),
+)
+merged_data.rename(columns={"Time (hrs)": "Time"}, inplace=True)
+merged_data = merged_data[merged_data["Time"] != 0]
+merged_data = merged_data[merged_data["Time"] < 8]
+merged_data["Normalized_Change_Rate_cytokine"]
+merged_data["Normalized_Change_Rate_speck"]
+model = smf.mixedlm(
+    "Normalized_Change_Rate_cytokine ~ Normalized_Change_Rate_speck + Time",
+    data=merged_data,
+    groups=merged_data["Experimental_Replicate"],
+    re_formula="~Time",
+)
+result = model.fit()
+print(result.summary())
+
+
+set1 = cyto.data
+set2 = speck.Max_Normalized_Measurement
+
+subset1 = set1[set1["Analyte"] == "IL18"]
+subsubset1 = subset1[subset1["Treatment"] == "MSU"]
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+subsubset1
+# plot subsetsubset1 with each experimental replicate as a different color line
+plt = sns.lineplot(
+    x="Time (hrs)", y="Measurement", hue="Experimental_Replicate", data=subsubset1
+)
+plt.show()
+
+subset2 = set2[set2["Treatment"] == "MSU"]
+
+TAS.modules["TS_Speck"].data[TAS.modules["TS_Speck"].data["Treatment"] == "MSU"]

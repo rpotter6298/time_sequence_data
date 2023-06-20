@@ -37,6 +37,7 @@ TAS.compute_ratio("TS_Cyto")
 
 def ax_modification(ax):
     ax.set_title(str("Inflammasome Speck Count over Time"))
+    ax.set_ylabel("ASC-Speck Count")
 
 
 ## SPECK CURVES IN THE SAME PLOT WITH RAW COUNTS
@@ -54,7 +55,8 @@ plotting_module.plot_lineplot(
         TAS.modules["TS_Speck"],
         treatments=["ATP", "MSU", "Nigericin"],
         measurement_type="Measurement",
-    )
+    ),
+    manual_ax_modification=ax_modification,
 )
 
 plotting_module.plot_lineplot(
@@ -63,7 +65,7 @@ plotting_module.plot_lineplot(
         treatments=["MSU", "MCC950_MSU"],
         measurement_type="Normalized_Measurement",
     ),
-    errorbar="ci"
+    errorbar="ci",
 )
 
 ## SEPARATE ATP SPECK CURVE WITH RAW COUNTS
@@ -170,6 +172,8 @@ for treatment in ["MCC950_ATP", "MCC950_MSU", "MCC950_Nigericin"]:
         ax.set_title(str("Inflammasome Speck Count over Time - " + treatment_name))
         ymin, ymax = ax.get_ylim()
         ax.set_ylim(ymin, ymax * 1.1)
+        # set y axis label
+        ax.set_ylabel("ASC-Speck Formation")
         handles, labels = ax.get_legend_handles_labels()
         new_labels = [label.replace("_", " + ") for label in labels]
         ax.legend(handles, new_labels)
@@ -183,7 +187,33 @@ for treatment in ["MCC950_ATP", "MCC950_MSU", "MCC950_Nigericin"]:
         manual_ax_modification=ax_modification,
     )
 
+## Line Plots of Speck data for only each non-MCC950 treatment
+for treatment in ["ATP", "MSU", "Nigericin"]:
+    treatment_name = treatment.replace("_", " + ")
+
+    def ax_modification(ax):
+        ax.set_title(str("Inflammasome Speck Count over Time - " + treatment_name))
+        ymin, ymax = ax.get_ylim()
+        ax.set_ylim(ymin, ymax * 1.1)
+        # set y axis label
+        ax.set_ylabel("ASC-Speck Formation")
+        handles, labels = ax.get_legend_handles_labels()
+        new_labels = [label.replace("_", " + ") for label in labels]
+        ax.legend(handles, new_labels)
+
+    plotting_module.plot_lineplot(
+        **TAS.prepare_lineplot(
+            TAS.modules["TS_Speck"],
+            treatments=[treatment],
+            measurement_type="Measurement",
+        ),
+        manual_ax_modification=ax_modification,
+    )
+
+
 def ax_modification(ax):
     ax.set_title("Ratio of IL-1β:IL-18 Concentration over Time")
     ax.set_ylabel("IL-1β:IL-18 Concentration Ratio")
+
+
 plotting_module.plot_ratio(cyto, invert=True, manual_ax_modification=ax_modification)

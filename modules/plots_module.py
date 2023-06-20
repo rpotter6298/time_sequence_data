@@ -143,8 +143,13 @@ class plotting_module:
 
     @staticmethod
     def plot_count_against_ratio(
-        ratio_name, treatments=None, invert=False, manual_ax_modification=None
+        analysis_module,
+        ratio_name,
+        treatments=None,
+        invert=False,
+        manual_ax_modification=None,
     ):
+        TAS = analysis_module
         speck_info = TAS.modules["TS_Speck"]
         ratio_info = TAS.modules["TS_Cyto"].ratio_data[ratio_name]
         ratio_name_x = ratio_name.split(":")[0]

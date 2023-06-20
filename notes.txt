@@ -19,3 +19,11 @@ In other words "Are the peaks significantly different from the start"
 Conversely, significant times table evaluates this on a strictly per-time bases so the curves are not aligned between replicates (especially ATP).
 This is more of a "At any given time can we confirm significant changes"
 These give different answers, so it took me a while to figure out why that was.
+
+Find a better way to do the growth rate, maybe slope over time period
+
+Calculate change rate based on proportion compared to previous measurement_type - note in the excel
+Calculate max change rate based on mean of change rates at time, not mean of max times
+Rewrite section in paper
+Get rid of juxtaposed
+Why is there correction for multiple testing in the means testing
